@@ -1,0 +1,278 @@
+% =============================================================
+% editmarks.sty - edits shown in the colour and initials of the person who made them (paperkit)
+% =============================================================
+% Load xcolor, with any options you need, before this package.
+%
+% SETUP (preamble)
+%   \usepackage[draft]{editmarks}        % draft (default) | final
+%   \DeclareEditor{anna}{AK}             % the next of 13 palette colours
+%   \DeclareEditor[RoyalBlue]{ben}{BO}   % or any xcolor colour
+%   \editorname{anna}{Anna Keller}       % optional, used by \editlegend
+%
+% OPTIONS
+%   draft          show every edit in its editor's colour (default)
+%   final          accept all edits: added text as normal text, deletions
+%                  and notes removed; \TODO and \pending warn in the log
+%   tags=<bool>    initials in superscript after each \added, \deleted and \replaced (default true)
+%
+% MARKING EDITS (<key> = a declared editor)
+%   \added{<key>}{<text>}           \deleted{<key>}{<text>}
+%   \replaced{<key>}{<new>}{<old>}  \authnote{<key>}{<note>}
+%   \begin{addedblock}{<key>} ... \end{addedblock}     paragraphs, floats,
+%   \begin{deletedblock}{<key>} ... \end{deletedblock} equations
+%   \TODO{<text>}      red framed note; in final mode only a log warning
+%   \pending{<text>}   a result still to update: pink in both modes,
+%                      with a log warning in final mode
+%
+% PER PERSON (anywhere, also in the preamble; lists like {anna,ben})
+%   \acceptedits{anna}  \showedits{anna}  \acceptalledits  \showalledits
+%   \editlegend        a colour square, [AK] and the name of each shown editor
+%                      with marks
+%   \editsummary       a table of edit counts per editor with marks, from the
+%                      previous run
+%
+% RULES
+%   * Undeclared editor keys and keys declared twice are errors.
+%   * \deleted and \replaced use ulem's \sout: no paragraph breaks inside
+%     (use deletedblock) and put \cite, \ref or math in braces: {\cite{x}}.
+%   * deletedblock reads its body as an argument: no verbatim inside.
+%   * In final mode \showedits has no effect. The class options draft
+%     and final do not apply; only this package's own option does.
+%   * Legend and summary leave out editors without marks in the previous
+%     run (until the first rerun they list everyone).
+%   * A file editmarks.cfg on TeX's search path is read at the end of
+%     this package. Use it for editors shared by all papers of a research group.
+% =============================================================
+
+\NeedsTeXFormat{LaTeX2e}[2022/11/01]
+\ProvidesPackage{editmarks}[2026/10/26 Per-person coloured edits (paperkit)]
+
+\RequirePackage{etoolbox}
+\RequirePackage{xcolor}
+\@ifpackageloaded{ulem}{}{\RequirePackage[normalem]{ulem}}
+
+% --- Options -------------------------------------------------
+\newif\ifem@final
+\newif\ifem@tags \em@tagstrue
+\DeclareKeys{
+  draft.code  = \em@finalfalse,
+  draft.value_forbidden:n = true,
+  final.code  = \em@finaltrue,
+  final.value_forbidden:n = true,
+  tags.if     = em@tags,
+  tags.default:n = true,
+}
+% Class options such as [final] must not switch edits off: hide them here.
+\let\em@classopts\@raw@classoptionslist % (\relax = no class options)
+\let\@raw@classoptionslist\relax
+\ProcessKeyOptions
+\let\@raw@classoptionslist\em@classopts
+
+% --- Colours -------------------------------------------------
+% Okabe-Ito (without yellow and black), then the darker colours of
+% Paul Tol's muted set. After the 13th editor the colours repeat,
+% with a warning in the log; the initials still tell people apart.
+\definecolor{em@pal1}{HTML}{D55E00}% vermillion
+\definecolor{em@pal2}{HTML}{0072B2}% blue
+\definecolor{em@pal3}{HTML}{009E73}% bluish green
+\definecolor{em@pal4}{HTML}{CC79A7}% reddish purple
+\definecolor{em@pal5}{HTML}{E69F00}% orange
+\definecolor{em@pal6}{HTML}{56B4E9}% sky blue
+\definecolor{em@pal7}{HTML}{332288}% indigo
+\definecolor{em@pal8}{HTML}{117733}% green
+\definecolor{em@pal9}{HTML}{882255}% wine
+\definecolor{em@pal10}{HTML}{44AA99}% teal
+\definecolor{em@pal11}{HTML}{999933}% olive
+\definecolor{em@pal12}{HTML}{AA4499}% purple
+\definecolor{em@pal13}{HTML}{CC6677}% rose
+\def\em@npal{13}
+\definecolor{PendingPink}{RGB}{190,35,115}
+\definecolor{em@todo}{HTML}{D00000}
+\newcount\em@ncolor
+\newcommand{\em@nextcolor}[1]{% {key}: the next palette colour
+  \global\advance\em@ncolor 1
+  \ifnum\em@ncolor>\em@npal\relax
+    \PackageWarning{editmarks}{Editor `#1' gets a colour that is already
+      used (\em@npal\space automatic colours). Give a colour:
+      \string\DeclareEditor[<colour>]{#1}{...}}%
+  \fi
+  \@tempcnta\em@ncolor
+  \loop\ifnum\@tempcnta>\em@npal\relax \advance\@tempcnta-\em@npal\relax\repeat
+  \colorlet{em@col@#1}{em@pal\the\@tempcnta}}
+
+% --- Declaring editors ---------------------------------------
+\def\em@editors{}% comma list of keys, in declaration order
+\NewDocumentCommand{\DeclareEditor}{O{}mm}{%
+  \ifcsdef{em@ini@#2}
+    {\PackageError{editmarks}{Editor `#2' is declared twice}{}}
+    {\ifstrempty{#1}% default: the next palette colour
+       {\em@nextcolor{#2}}
+       {\colorlet{em@col@#2}{#1}}%
+     \csdef{em@ini@#2}{#3}%
+     \csdef{em@name@#2}{#2}%
+     \csletcs{em@on@#2}{@firstoftwo}% shown by default
+     \ifdefempty{\em@editors}{\def\em@editors{#2}}{\appto\em@editors{,#2}}%
+     \em@zero{#2}}}
+\@onlypreamble\DeclareEditor
+\NewDocumentCommand{\editorname}{mm}{\em@need{#1}{\csdef{em@name@#1}{#2}}}
+
+% \em@need{<key>}{<code>}: run code if <key> is declared, else error
+\newcommand{\em@need}[2]{%
+  \ifcsdef{em@ini@#1}{#2}
+    {\PackageError{editmarks}{Undeclared editor `#1'}
+      {Declared editors: \em@editors. Add \string\DeclareEditor{#1}{<initials>}
+       to the preamble.}}}
+
+% --- Showing / accepting -------------------------------------
+\NewDocumentCommand{\acceptedits}{m}{%
+  \forcsvlist{\em@accept}{#1}}
+\NewDocumentCommand{\showedits}{m}{%
+  \forcsvlist{\em@show}{#1}}
+\newcommand{\em@accept}[1]{\em@need{#1}{\csletcs{em@on@#1}{@secondoftwo}}}
+\newcommand{\em@show}[1]{\em@need{#1}{\csletcs{em@on@#1}{@firstoftwo}}}
+\NewDocumentCommand{\acceptalledits}{}{%
+  \expandafter\forcsvlist\expandafter\em@accept\expandafter{\em@editors}}
+\NewDocumentCommand{\showalledits}{}{%
+  \expandafter\forcsvlist\expandafter\em@show\expandafter{\em@editors}}
+
+% \em@if{<key>}{<shown>}{<accepted>}: error (and accepted) if undeclared
+\newcommand{\em@if}[3]{%
+  \ifcsdef{em@ini@#1}
+    {\ifem@final #3\else\csname em@on@#1\endcsname{#2}{#3}\fi}
+    {\em@need{#1}{}#3}}
+
+\newcommand{\em@tag}[1]{%
+  \ifem@tags\textsuperscript{\textcolor{em@col@#1}{\csname em@ini@#1\endcsname}}\fi}
+
+% --- Counting (for \editsummary; read back from the .aux) ----
+\newcommand{\em@zero}[1]{%
+  \csgdef{em@n@add@#1}{0}\csgdef{em@n@del@#1}{0}%
+  \csgdef{em@n@rep@#1}{0}\csgdef{em@n@note@#1}{0}}
+\newcommand{\em@count}[2]{% {add|del|rep|note}{key}
+  \ifcsdef{em@n@#1@#2}
+    {\csxdef{em@n@#1@#2}{\the\numexpr\csname em@n@#1@#2\endcsname+1}}{}}
+\newcommand{\em@prev}[5]{% written to the .aux at the end of a run
+  \csgdef{em@p@#1}{{#2}{#3}{#4}{#5}}}
+\AtBeginDocument{%
+  \if@filesw\immediate\write\@auxout{\string\providecommand\string\em@prev[5]{}}\fi}
+\AtEndDocument{%
+  \if@filesw
+    \def\do#1{\immediate\write\@auxout{\string\em@prev{#1}% hook code: single #
+      {\csname em@n@add@#1\endcsname}{\csname em@n@del@#1\endcsname}%
+      {\csname em@n@rep@#1\endcsname}{\csname em@n@note@#1\endcsname}}}%
+    \expandafter\docsvlist\expandafter{\em@editors}%
+  \fi}
+
+% --- Inline marks --------------------------------------------
+\NewDocumentCommand{\added}{m+m}{\em@count{add}{#1}%
+  \em@if{#1}{{\color{em@col@#1}#2}\em@tag{#1}}{#2}}
+\NewDocumentCommand{\deleted}{mm}{\em@count{del}{#1}%
+  \em@if{#1}{{\color{em@col@#1}\sout{#2}}\em@tag{#1}}{}}
+\NewDocumentCommand{\replaced}{m+mm}{\em@count{rep}{#1}%
+  \em@if{#1}{{\color{em@col@#1}#2\,\sout{#3}}\em@tag{#1}}{#2}}
+\NewDocumentCommand{\authnote}{m+m}{\em@count{note}{#1}%
+  \em@if{#1}{{\color{em@col@#1}\,[\textbf{\csname em@ini@#1\endcsname:} #2]}}{}}
+
+% --- Blocks --------------------------------------------------
+% A small marker line names the editor; floats inside keep the colour.
+\newcommand{\em@marker}[2]{% {key}{text after initials}
+  \par\noindent{\scriptsize\textcolor{em@col@#1}%
+    {\ensuremath{\triangleright}\,\csname em@ini@#1\endcsname#2}}\par\nopagebreak}
+\newcommand{\em@blockcolor}[1]{% (floats and minipages start with \@setminipage)
+  \color{em@col@#1}\appto\@setminipage{\color{em@col@#1}}}
+\NewDocumentEnvironment{addedblock}{m}
+  {\em@count{add}{#1}\em@if{#1}{\em@marker{#1}{}\em@blockcolor{#1}}{}}
+  {\par}
+\NewDocumentEnvironment{deletedblock}{m+b}
+  {\em@count{del}{#1}%
+   \em@if{#1}{\em@marker{#1}{\ deleted}{\em@blockcolor{#1}#2\par}%
+              \em@marker{#1}{\ end deleted}}{}}
+  {}
+
+% --- Notes that must not reach the submitted PDF ------------
+\newcount\em@ntodo
+\newcount\em@npending
+\NewDocumentCommand{\TODO}{+m}{%
+  \global\advance\em@ntodo 1
+  \ifem@final
+    \PackageWarning{editmarks}{TODO left in final mode: \detokenize{#1}}%
+  \else\em@todobox{#1}\fi}
+\newsavebox\em@box
+\newcommand{\em@todobox}[1]{%
+  \sbox\em@box{\color{em@todo}\textbf{TODO:} #1}%
+  \ifdim\wd\em@box>\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax
+    \par\noindent% long note: a framed block of its own
+    \fcolorbox{em@todo}{white}{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}%
+      {\raggedright\color{em@todo}\textbf{TODO:} #1}}\par
+  \else
+    \leavevmode\fcolorbox{em@todo}{white}{\usebox\em@box}%
+  \fi}
+\NewDocumentCommand{\pending}{+m}{%
+  \global\advance\em@npending 1
+  \ifem@final
+    \PackageWarning{editmarks}{Pending result in final mode: \detokenize{#1}}%
+  \fi
+  {\color{PendingPink}#1}}
+\AtEndDocument{%
+  \ifem@final
+    \ifnum\numexpr\em@ntodo+\em@npending>0
+      \PackageWarningNoLine{editmarks}{Final mode: \the\em@ntodo\space TODO(s)
+        and \the\em@npending\space pending result(s) remain}%
+    \fi
+  \fi}
+
+% --- Legend and summary (draft only) -------------------------
+% \em@hasmarks{<key>}{<yes>}{<no>}: no only when the previous run counted
+% no marks for <key>
+\newcommand{\em@hasmarks}[1]{%
+  \ifcsdef{em@p@#1}
+    {\letcs\em@tmp{em@p@#1}\expandafter\em@anymarks\em@tmp}
+    {\@firstoftwo}}
+\newcommand{\em@anymarks}[4]{%
+  \ifnum\numexpr#1+#2+#3+#4\relax>\z@
+    \expandafter\@firstoftwo\else\expandafter\@secondoftwo\fi}
+\newcommand{\em@iflegend}[2]{% {key}{code}: code if this editor is shown and has marks
+  \ifcsdef{em@ini@#1}{\csname em@on@#1\endcsname{\em@hasmarks{#1}{#2}{}}{}}{}}
+\NewDocumentCommand{\editlegend}{}{%
+  \ifem@final\else
+    \def\em@legacc{}%
+    \def\do##1{\em@iflegend{##1}{\appto\em@legacc{\hspace{0.5em}\mbox{%
+        \textcolor{em@col@##1}{\rule{0.7em}{0.7em}\,%
+          [\csname em@ini@##1\endcsname]}\,\csname em@name@##1\endcsname}}}}%
+    \expandafter\docsvlist\expandafter{\em@editors}%
+    \ifx\em@legacc\@empty\else
+      \par{\raggedright\noindent\footnotesize\textbf{Edits:}\em@legacc\par}%
+    \fi
+  \fi}
+\NewDocumentCommand{\editsummary}{}{%
+  \ifem@final\else
+    \em@rows
+    \ifx\em@rowsacc\@empty\else
+      \par\smallskip\noindent{\footnotesize
+      \begin{tabular}{@{}lrrrr@{}}
+        editor & added & deleted & replaced & notes\\\hline
+        \em@rowsacc
+      \end{tabular}}\par
+    \fi
+  \fi}
+\newcommand{\em@rows}{% builds \em@rowsacc (rows from the previous run)
+  \def\em@rowsacc{}%
+  \def\do##1{\ifcsdef{em@p@##1}
+    {\em@hasmarks{##1}
+      {\appto\em@rowsacc{\textcolor{em@col@##1}{[\csname em@ini@##1\endcsname]}
+         \csname em@name@##1\endcsname}%
+       \letcs\em@tmp{em@p@##1}%
+       \eappto\em@rowsacc{\expandafter\em@cells\em@tmp}}{}}
+    {\def\em@rowsacc{\multicolumn{5}{@{}l@{}}{\emph{(rerun LaTeX for edit counts)}}\\}%
+     \def\do####1{}}}%
+  \expandafter\docsvlist\expandafter{\em@editors}}
+\newcommand{\em@cells}[4]{&#1&#2&#3&#4\noexpand\\}
+
+% --- PDF bookmarks (hyperref): keep the accepted text --------
+\AtBeginDocument{\@ifpackageloaded{hyperref}{%
+  \pdfstringdefDisableCommands{%
+    \def\added#1#2{#2}\def\deleted#1#2{}\def\replaced#1#2#3{#2}%
+    \def\authnote#1#2{}\def\TODO#1{}\def\pending#1{#1}}}{}}
+
+% --- Shared editors ------------------------------------------
+\InputIfFileExists{editmarks.cfg}{}{}

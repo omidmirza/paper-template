@@ -1,0 +1,9 @@
+% versions/conference.tex - the conference version, IEEE conference template (IEEEtran).
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line, \paperversion and the page limit.
+% page limit: 6   % references included; make -f .github/Makefile prints OVER when the PDF is longer
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass[conference]{IEEEtran}
+\def\paperentryclassloaded{1}
+\def\paperversion{conference}
+\PassOptionsToPackage{final}{editmarks}   % accept every edit; this PDF is the one you submit
+\input{main}

@@ -1,0 +1,29 @@
+% main.tex - the body of the paper. Each file in versions/ sets the template and the version, then inputs this file.
+% Compiled alone, it builds the review copy on Overleaf and the conference version on a laptop.
+% Settings are in setup.tex, the text, appendix and tables in sections/, the figure code in figures/src/.
+% The title block of each template is in .github/tex/layout.tex; latexmkrc adds .github/ to the TeX search path.
+% New project, with a paid or institutional Overleaf plan (ETH has one): on GitHub press "Use this template", then on Overleaf New Project > Import from GitHub.
+% Otherwise: download template-for-overleaf.zip from github.com/omidmirza/paper-template/releases, then on Overleaf New Project > Upload Project.
+% Then fill in setup.tex and press Recompile. For one version, open its file in versions/ and press Recompile.
+\ifdefined\paperentryclassloaded\else
+  \documentclass[conference]{IEEEtran}
+\fi
+\input{setup}
+\input{layout}
+
+\begin{document}
+\paperfront
+\editlegend\editsummary
+
+\input{sections/intro}
+\input{sections/results}
+
+\bibliographystyle{\paperbibstyle}
+\bibliography{refs/references}
+
+\begin{arxiv}
+\appendix
+\section{Proofs}\label{app:proofs}
+\input{sections/appendix_proofs}
+\end{arxiv}
+\end{document}

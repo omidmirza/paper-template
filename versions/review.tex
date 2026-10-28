@@ -1,0 +1,9 @@
+% versions/review.tex - the review copy: every version and every edit in colour, IEEE conference template (IEEEtran).
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line. Keep \paperversion as review.
+% page limit: none   % or a number of pages, references included; make -f .github/Makefile prints OVER when the PDF is longer
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass[conference]{IEEEtran}
+\def\paperentryclassloaded{1}
+\def\paperversion{review}
+% no final option here, so every edit shows with its author
+\input{main}

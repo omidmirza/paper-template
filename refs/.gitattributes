@@ -1,0 +1,2 @@
+# extended_labels.tex holds the labels of the arXiv version; the build writes it. On a merge conflict, keep either side and build again.
+extended_labels.tex binary

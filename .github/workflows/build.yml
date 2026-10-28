@@ -1,0 +1,103 @@
+# .github/workflows/build.yml - builds every version on each push and pull request, on any branch.
+# The job summary has one row per version: status, pages, page limit, undefined references.
+# To download them, open Actions > the run > Artifacts. `pdfs` has the PDFs; `overleaf` has the paper for
+# Overleaf's Upload Project. The upload drops folders that start with a dot, so .github/tex is github/tex there.
+
+name: paper
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch or pull request cancels a run that is still going.
+concurrency:
+  group: paper-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: texlive/texlive:latest   # full TeX Live: latexmk, latexdiff, latexpand
+    steps:
+      - name: Install tools (git first, so that the checkout is a git repository)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git python3-venv python3-pip poppler-utils ghostscript >/dev/null
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                # full history and tags, for steps you add that run diff.sh or release.sh
+
+      - name: Install the Python packages
+        run: |
+          python3 -m venv /opt/venv
+          /opt/venv/bin/pip install -q -r .github/python/requirements.txt
+
+      - name: Build every version
+        env:
+          PAPERKIT_PYTHON: /opt/venv/bin/python
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          echo "### ${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          bash .github/tools/build.sh
+
+      - name: Check the figure rules and the figure text size in the PDFs
+        env:
+          PYTHONPATH: .github/python
+        run: |
+          /opt/venv/bin/python -m autofig check figures/auto/*_w*.pdf
+          for f in .github/pdf/*.pdf; do /opt/venv/bin/python -m autofig audit "$f"; done
+
+      - name: Check that the committed figures are up to date
+        if: always()
+        run: |
+          stale="$(git status --porcelain -- figures refs)"
+          if [ -n "$stale" ]; then
+            echo "$stale"
+            echo "::warning::The build changed figures/auto or refs/extended_labels.tex. Run make -f .github/Makefile on your computer and commit the changes (Overleaf cannot draw figures)."
+            printf '\n**The committed figures are out of date.** Run `make -f .github/Makefile` and commit `figures/auto` and `refs`. Changed files:\n\n```\n%s\n```\n' "$stale" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '\nCommitted figures are up to date.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pdfs
+          path: .github/pdf/*.pdf
+          if-no-files-found: warn
+
+      - name: Copy the paper for Overleaf's Upload Project
+        if: always()
+        run: |
+          rm -rf .github/build/overleaf && mkdir -p .github/build/overleaf/github
+          git ls-files -z -- . ':(exclude).github' ':(exclude)**/.gitattributes' | xargs -0 cp --parents -t .github/build/overleaf
+          cp -R .github/tex .github/build/overleaf/github/
+          mkdir -p .github/build/overleaf/github/ai && cp .github/ai/editmarks.cfg .github/build/overleaf/github/ai/   # declares the editor ai
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overleaf
+          path: .github/build/overleaf/
+
+# Optional job: commit the redrawn figures to the pushed branch. To use it, uncomment it and set Settings, Actions,
+# General, Workflow permissions to "Read and write permissions". [skip ci] stops its push from starting a new run.
+#  figures-back:
+#    needs: build
+#    if: github.event_name == 'push'
+#    runs-on: ubuntu-latest
+#    container: texlive/texlive:latest
+#    permissions:
+#      contents: write
+#    steps:
+#      - run: apt-get update -qq && apt-get install -y -qq git python3-venv >/dev/null
+#      - uses: actions/checkout@v4
+#      - run: |
+#          python3 -m venv /opt/venv && /opt/venv/bin/pip install -q -r .github/python/requirements.txt
+#          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+#          PAPERKIT_PYTHON=/opt/venv/bin/python bash .github/tools/build.sh
+#          git config user.name "figure-bot"; git config user.email "figure-bot@users.noreply.github.com"
+#          git add -A figures refs
+#          git diff --cached --quiet || { git commit -m "Redraw figures [skip ci]" && git push; }

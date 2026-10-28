@@ -1,0 +1,17 @@
+% sections/results.tex - a figure drawn at its final size, and a table with a short and a full version.
+% figures/src/simulate.py writes figures/data/example.csv and figures/src/example.py plots it. make -f .github/Makefile draws the figure.
+\section{Results}\label{sec:results}
+\Cref{fig:example} is drawn by figures/src/example.py from figures/data/example.csv, at the width of this column.
+\Cref{tab:example} lists the time constants.
+\begin{figure}[!htb]
+  \centering
+  \autofig[aspect=\figaspect]{example}
+  \caption{An example figure. Its text has the size of the body text.}
+  \label{fig:example}
+\end{figure}
+\begin{table}[!htb]
+  \centering
+  \caption{An example table, short in the conference version.}
+  \label{tab:example}
+  \ifversion{conference}{\input{sections/table_short}}{\input{sections/table_full}}
+\end{table}

@@ -1,0 +1,4 @@
+# The drawn figures are build output. They are marked binary, so git never merges them line by line.
+# On a merge conflict here, keep either side (git checkout --ours <file>), run make -f .github/Makefile and commit.
+*.pdf binary
+*.json binary

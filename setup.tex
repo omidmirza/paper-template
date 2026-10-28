@@ -1,0 +1,72 @@
+% setup.tex - the settings of this paper (title, authors, versions, co-authors, figures). Change the parts marked EDIT HERE.
+% Each PDF has its own file in versions/, with its template and page limit.
+% toggle_helper.tex lists every command and what each version prints. make -f .github/Makefile help lists the laptop build targets.
+% On Overleaf, press Recompile; main.tex builds the review copy. For one version, open its file in versions/
+% and press Recompile. The top of main.tex says how to start a new project.
+
+\usepackage[dvipsnames]{xcolor}   % load first; the packages below use its colour names
+
+% ---- EDIT HERE: title, authors, affiliation
+% .github/tex/layout.tex prints them in the format of each template.
+\newcommand{\papertitle}{Your title}
+\newcommand{\paperauthors}{First Author, Second Author and Third Author}
+\newcommand{\paperaffiliation}{Your institute}
+\newcommand{\paperkeywords}{keyword one, keyword two}   % printed by the ACM template
+% \newcommand{\paperccs}{\ccsdesc[500]{Computer systems organization~Embedded systems}}   % ACM CCS concept
+
+% ---- EDIT HERE: versions
+% One line per version. The colour is used only in the review copy; without one, the next palette colour is used.
+% Choose any names. To rename a version, also rename it in versions/ and sections/; arxiv is also used in main.tex and .github/tex/layout.tex.
+% Declare a name before you use it.
+% Package options:
+%   version=<name>      the version that main.tex builds on its own, on a laptop (review gives the review copy)
+%   overleaf=<name>     the same, on Overleaf
+%   label=auto          the version name in red at the top right of each page, in the review copy only
+%   label=true / false  on every page / never (label alone means label=true, nolabel means label=false)
+% A file in versions/ sets \paperversion, which overrides version= and overleaf=.
+\usepackage[version=conference, overleaf=review]{versiontoggle}
+\DeclareVersion[red!60!black]{conference}
+\DeclareVersion[Brown]{journal}
+\DeclareVersion[OliveGreen]{arxiv}
+% \DeclareVersion{blind}                    % a new version: this line and one file in versions/
+\DeclareVersionGroup{long}{journal,arxiv}   % one name for several versions; works in every version list
+
+% In the review copy, text of one version is in that version's colour, text shared by several is dark blue,
+% and the two sides of \ifversion stand next to each other with a grey bar between them.
+% \renewcommand{\versionseparator}{ / }                       % another separator
+% \makeatletter\colorlet{vt@color@multi}{teal}\makeatother   % another colour for shared text
+
+% ---- EDIT HERE: people who edit
+% One line per person: key, initials, full name.
+% Replace author1-3 with the real people, and the keys author1 and author2 in sections/intro.tex with theirs.
+% The colour is optional; without one, each person gets the next of 13 colours (Okabe-Ito, then Paul Tol's muted set).
+% Package options: draft (the default) shows every edit in colour, final accepts every edit,
+% tags=false hides the initials after each edit. Every file in versions/ except review.tex passes final.
+\usepackage{editmarks}
+\DeclareEditor{author1}{A1}   \editorname{author1}{First Author}
+\DeclareEditor{author2}{A2}   \editorname{author2}{Second Author}
+\DeclareEditor{author3}{A3}   \editorname{author3}{Third Author}
+% \DeclareEditor[RoyalBlue]{author4}{A4}   \editorname{author4}{Fourth Author}   % with a chosen colour
+% \acceptedits{author3}   % accept one person's edits (a list works too); \showedits{author3} undoes it
+% \acceptalledits         % accept everyone's edits from here on; \showalledits undoes it
+
+% ---- Figures drawn at their final size
+% \autofig{example} includes the figure that figures/src/example.py draws for the line width at that point (make -f .github/Makefile draws it).
+% Keys: aspect=0.5 (height = 0.5 x width), height=4cm, font=11pt, compact (all text at body size).
+% Package options: draft (the default) frames a stale or wrong-size figure in red; final drops the frame and only logs it. A missing figure is a red box in both.
+\usepackage{autofig}
+% \autofigsetup{dir=figures/auto, rawdir=figures/raw}   % where the figures are (these are the defaults)
+
+% ---- Settings for one version
+% Use \ifversion here. In the review copy, \ifversion in the preamble acts as the first declared version (conference).
+% \ifversion{conference}{\newcommand{\stepaspect}{0.5}}{\newcommand{\stepaspect}{0.62}}   % a figure size
+% \ifversion{conference}{\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}}{}            % less space around floats
+
+% ---- Templates and page limits
+% Each file in versions/ has one class line (shown here without its backslash) and one page limit line:
+%   documentclass[conference]{IEEEtran}   documentclass{elsarticle}   documentclass{llncs}
+%   documentclass[sigconf]{acmart}        documentclass[11pt]{article}
+%   documentclass[journal]{IEEEtran}      documentclass[letterpaper,10pt,conference]{ieeeconf}   (CDC, ACC)
+%   % page limit: 6                        make -f .github/Makefile prints OVER when the PDF is longer
+% For another class, copy a file in versions/ and change that line.
+% If the title block looks wrong, add a branch for the class in .github/tex/layout.tex.

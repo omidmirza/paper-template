@@ -1,0 +1,9 @@
+% versions/tac.tex - the journal version, IEEE Transactions template, for example TAC (IEEEtran journal).
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line, \paperversion and the page limit.
+% page limit: 12   % TAC regular paper: 12 pages with references
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass[journal]{IEEEtran}
+\def\paperentryclassloaded{1}
+\def\paperversion{journal}
+\PassOptionsToPackage{final}{editmarks}   % accept every edit; this PDF is the one you submit
+\input{main}

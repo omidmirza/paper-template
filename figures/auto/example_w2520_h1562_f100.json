@@ -1,0 +1,24 @@
+{
+ "name": "example",
+ "spec": "figures/src/example.py",
+ "spec_hash": "e39df873f89c70da",
+ "style_version": "v8-paperkit-1",
+ "request": {
+  "w": 252.0,
+  "h": 156.24,
+  "f": 10.0,
+  "family": "serif",
+  "compact": false
+ },
+ "size_pt": [
+  252.0,
+  156.24
+ ],
+ "min_text_pt": 11.0,
+ "warnings": [],
+ "jobs": [
+  "conference",
+  "review",
+  "tac"
+ ]
+}

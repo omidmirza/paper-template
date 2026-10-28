@@ -1,0 +1,22 @@
+{
+ "name": "example",
+ "spec": "figures/src/example.py",
+ "spec_hash": "e39df873f89c70da",
+ "style_version": "v8-paperkit-1",
+ "request": {
+  "w": 347.12,
+  "h": 156.2,
+  "f": 10.0,
+  "family": "serif",
+  "compact": false
+ },
+ "size_pt": [
+  347.13,
+  156.2
+ ],
+ "min_text_pt": 11.0,
+ "warnings": [],
+ "jobs": [
+  "springer"
+ ]
+}

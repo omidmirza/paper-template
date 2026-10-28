@@ -1,0 +1,9 @@
+% versions/cdc.tex - the conference version, IEEE CDC and ACC template (ieeeconf.cls, in .github/tex/).
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line, \paperversion and the page limit.
+% page limit: 6   % CDC and ACC: 6 pages with references (more for a fee)
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass[letterpaper,10pt,conference]{ieeeconf}
+\def\paperentryclassloaded{1}
+\def\paperversion{conference}
+\PassOptionsToPackage{final}{editmarks}   % accept every edit; this PDF is the one you submit
+\input{main}

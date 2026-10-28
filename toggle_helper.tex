@@ -1,0 +1,224 @@
+% ===================================================================
+%  toggle_helper.tex - how to write one paper for several versions
+%  Version toggles and workflow: Omid Mirzaeedodangeh.
+% ===================================================================
+%  For reading only: it is never compiled or \input. Lines without %
+%  are LaTeX to copy into sections/*.tex; the % lines explain them.
+%
+%  Versions of this template (change them in setup.tex):
+%    conference   versions/conference.tex   IEEE, two columns, 6 pages
+%    journal      versions/journal.tex      Elsevier, one column
+%    arxiv        versions/arxiv.tex        article, one column, proofs
+%    long         a group: journal and arxiv together
+%  The review copy (versions/review.tex, or main.tex on Overleaf)
+%  shows every version at once, each part in its version's colour.
+% ===================================================================
+
+
+% ===================================================================
+%  COMMANDS
+% ===================================================================
+%  arXiv only                  \onlyin{arxiv}{...}
+%                              \begin{arxiv} ... \end{arxiv}
+%  conference only             \onlyin{conference}{...}
+%                              \begin{conference} ... \end{conference}
+%  journal and arXiv           \onlyin{long}{...}
+%  not in conference           \exceptin{conference}{...}
+%  two versions, by name       \onlyin{journal,arxiv}{...}
+%  two wordings                \ifversion{conference}{short}{long}
+%  a figure for a group        \ifversion{long}{...}{}
+%  a pointer to the appendix   \arxivref{app:proofs}
+%  a setting for one version   \ifversion{conference}{...}{}  in setup.tex
+%
+%  The inline commands take any text, figures and equations included,
+%  but no verbatim (\verb, verbatim). The environments, one per version
+%  name, take anything; put \begin and \end each on a line of their own.
+%  Groups have no environment: use \ifversion{long}{...}{}.
+
+
+% ===================================================================
+%  1. A sentence only in the long versions
+% ===================================================================
+We compare three controllers%
+\onlyin{long}{ and repeat the test with a load step}.
+%  conference:  We compare three controllers.
+%  journal:     We compare three controllers and repeat the test
+%               with a load step.
+%  arxiv:       same as journal
+%  review copy: the long part in dark blue (shared by two versions)
+
+
+% ===================================================================
+%  2. Two wordings of one sentence
+% ===================================================================
+We use a \ifversion{conference}{PI controller}{PI controller with anti-windup}.
+%  conference:  We use a PI controller.
+%  journal:     We use a PI controller with anti-windup.
+%  arxiv:       same as journal
+%  review copy: both, side by side, with a grey bar between them
+
+
+% ===================================================================
+%  3. The proof only in arXiv, and a pointer to it everywhere
+% ===================================================================
+%  In the text:
+\begin{theorem}\label{thm:stable}
+  The closed loop is stable (proof in \arxivref{app:proofs}).
+\end{theorem}
+%  At the end of main.tex:
+\begin{arxiv}
+\appendix
+\section{Proofs}\label{app:proofs}
+\input{sections/appendix_proofs}
+\end{arxiv}
+%  conference:  (proof in Appendix A of [5])   and no appendix
+%  journal:     (proof in Appendix A of [5])   and no appendix
+%  arxiv:       (proof in Appendix A)          and the appendix
+%  [5] is the entry with the key arxiv in refs/references.bib: put
+%  your arXiv paper there. make -f .github/Makefile copies the labels
+%  of the arXiv version to refs/extended_labels.tex. Commit that file
+%  so the appendix numbers are right on Overleaf too.
+
+
+% ===================================================================
+%  4. A figure only in the journal and arXiv
+% ===================================================================
+\ifversion{long}{%
+\begin{figure}[t]
+  \autofig{example}
+  \caption{The speed after a load step.}\label{fig:load}
+\end{figure}
+}{}
+\onlyin{long}{Fig.~\ref{fig:load} shows the load step.}
+%  conference:  no figure, no sentence (so no "Fig. ??")
+%  journal:     the figure, drawn for one column, and the sentence
+%  arxiv:       same as journal
+
+
+% ===================================================================
+%  5. One more citation in the long versions
+% ===================================================================
+Speed control is often the first loop a student designs~\cite{franklin2019}%
+\onlyin{long}{ and~\cite{ogata2010}}.
+%  conference:  ... designs [1].
+%  journal:     ... designs [1] and [2].
+%  Both keys must be in refs/references.bib. Each reference list
+%  holds only what that version cites.
+
+
+% ===================================================================
+%  6. Making the conference version fit
+% ===================================================================
+%  Put each change inside a conference-only command, so the other
+%  versions do not change.
+%  One line fewer (put it inside the paragraph):
+\onlyin{conference}{\looseness=-1}
+%  A shorter caption:
+\caption{Speed\onlyin{long}{ after a step of the reference}.}
+%  Less space under a figure:
+\onlyin{conference}{\vspace{-2mm}}
+%  A narrower table:
+\ifversion{conference}{\setlength{\tabcolsep}{3pt}}{}
+%  Tighter floats (in setup.tex):
+\ifversion{conference}{\setlength{\textfloatsep}{6pt}}{}
+%  The line "% page limit: 6" in versions/conference.tex sets the limit;
+%  the laptop build prints OVER when the PDF is longer.
+
+
+% ===================================================================
+%  7. A new version, for example a thesis chapter
+% ===================================================================
+%  a) In setup.tex add:
+\DeclareVersion[Plum]{thesis}
+%     and, if it is a long version, change the group line to:
+\DeclareVersionGroup{long}{journal,arxiv,thesis}
+%  b) Copy versions/arxiv.tex to versions/thesis.tex, change the class
+%     line and the page limit, and set \def\paperversion{thesis}.
+%  c) Write \onlyin{thesis}{...} or \begin{thesis} ... \end{thesis}.
+%  On Overleaf, open versions/thesis.tex and press Recompile.
+
+
+% ===================================================================
+%  8. Co-author edits
+% ===================================================================
+%  One line per person in setup.tex (replace author1-3):
+\DeclareEditor{anna}{AK}   \editorname{anna}{Anna Keller}
+\DeclareEditor[RoyalBlue]{ben}{BO}   \editorname{ben}{Ben Osei}
+%  In the text:
+\added{anna}{new text}
+%    review copy: new text in Anna's colour, then AK
+%    other PDFs:  new text
+\deleted{anna}{old text}
+%    review copy: old text struck out     other PDFs: nothing
+\replaced{anna}{new}{old}
+%    review copy: new, then old struck out     other PDFs: new
+\authnote{anna}{add a reference}
+%    review copy: [AK: add a reference]     other PDFs: nothing
+\begin{addedblock}{anna}
+A whole new paragraph.
+\end{addedblock}
+%    review copy: the paragraph in Anna's colour     other PDFs: the paragraph
+\TODO{repeat with ten seeds}
+%    review copy: a red box     other PDFs: nothing, and a warning in the log
+\pending{0.4~ms}
+%    a number still to confirm: pink in every PDF; the submitted PDFs also
+%    log a warning
+%  Accepting edits:
+\acceptedits{anna}
+%    from here on Anna's edits are accepted, the others still show;
+%    \showedits{anna} shows them again; \acceptalledits accepts all.
+%  The files in versions/ (all but review.tex) accept every edit,
+%  so the PDFs you submit have no marks.
+
+
+% ===================================================================
+%  9. Figures
+% ===================================================================
+\autofig{example}
+%    figures/src/example.py, drawn at the line width
+\autofig[aspect=0.5]{example}
+%    height = 0.5 x width
+\autofig[height=4cm]{example}
+%    a fixed height
+\autofig[font=11pt]{example}
+%    base size 11 pt: labels 13 pt, ticks and legend 12 pt; do not set it
+%    below the body size
+\autofig[compact]{example}
+%    all figure text at the body size
+%  Each version writes the line width at every \autofig to its .afg
+%  file, so one \autofig fits every template. After changing a figure's
+%  code or its width, run make -f .github/Makefile and commit
+%  figures/auto (Overleaf cannot run Python).
+
+
+% ===================================================================
+%  10. Common mistakes
+% ===================================================================
+%  Verbatim cannot go inside an inline command:
+%    WRONG   \onlyin{arxiv}{\verb|x|}  -> error "File ended while scanning"
+%    RIGHT   the arxiv environment, \begin and \end on lines of their own
+%
+%  Words left behind in the other versions:
+%    WRONG   see\onlyin{arxiv}{ Fig.~\ref{fig:extra}} for details.
+%            -> conference: "see for details."
+%    RIGHT   \onlyin{arxiv}{ (see Fig.~\ref{fig:extra})}
+%
+%  A reference to a label only one version has gives "??":
+%    WRONG   see Appendix~\ref{app:proofs}  -> conference: "see Appendix ??"
+%    RIGHT   \arxivref{...} for the arXiv appendix, or keep the
+%            reference inside the same \onlyin as the label.
+%
+%  Version names are case sensitive:
+%    WRONG   \onlyin{arXiv}{...}  -> error "Unknown version `arXiv'"
+%    RIGHT   conference, journal, arxiv, long (as in setup.tex)
+%
+%  \deleted and \replaced work inside one paragraph. Put braces
+%  around \cite, \ref and math inside them:
+%    \replaced{anna}{{\cite{a}}}{{\cite{b}}}
+%
+%  Do not put the same \autofig on both sides of \ifversion: the review
+%  copy prints both. Use one \autofig and set its size per version in
+%  setup.tex (see the \stepaspect example there).
+%
+%  Renaming the version arxiv: main.tex and .github/tex/layout.tex
+%  use the name too; rename it there as well.

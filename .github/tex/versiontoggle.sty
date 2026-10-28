@@ -1,0 +1,336 @@
+% =============================================================
+% versiontoggle.sty - build several versions of a paper from one source
+% =============================================================
+% Version toggles and workflow: Omid Mirzaeedodangeh, 2026.
+% Additions of 2026-10-26 are marked [paperkit]: version groups,
+% \exceptin, \thisversion, the overleaf= option and \IfOverleafTF.
+%
+% SETUP (preamble)
+%   \usepackage[version=conference]{versiontoggle}
+%   \DeclareVersion{conference}           % review-mode colour: next in the palette
+%   \DeclareVersion[magenta]{journal}     % or a colour of your choice
+%   \DeclareVersion{arxiv}
+%
+%   \DeclareVersionGroup{long}{journal,arxiv}          % [paperkit]
+%
+%   version=review typesets the content of every version, each in its colour.
+%
+% PACKAGE OPTIONS
+%   version=<name>   version to build (required unless \paperversion is set)
+%   label=<value>    version name in small red text at the top right of
+%                    every page: auto (review mode only, the default),
+%                    true, or false. `label' alone means true; `nolabel'
+%                    means false.
+%   overleaf=<name>  [paperkit] version to build on Overleaf (job name
+%                    `output'), e.g. version=conference,overleaf=review.
+%                    Precedence: \paperversion > overleaf= (Overleaf only)
+%                    > version=.
+%
+% COMMAND-LINE OVERRIDE
+%   A \paperversion defined before \usepackage takes precedence over the
+%   version option, so a build script can choose the version without
+%   editing the source:
+%     latexmk -pdf -usepretex='\def\paperversion{journal}' main
+%
+% MARKING CONTENT (version names below; lists like {journal,arxiv} allowed)
+%   word / phrase          \onlyin{arxiv}{...}
+%   two wordings           \ifversion{conference}{short text}{long text}
+%   paragraph / figure /   \begin{arxiv}
+%     proof / equation       ...
+%                          \end{arxiv}
+%   preamble settings      \ifversion{conference}{...}{...}
+%   not in these versions  \exceptin{conference}{...}        [paperkit]
+%   version name as text   \thisversion (review in review mode) [paperkit]
+%   Overleaf or local      \IfOverleafTF{on Overleaf}{local}  [paperkit]
+%
+%   [paperkit] A group name works in every version list:
+%   \onlyin{long}{...}, \ifversion{long}{..}{..}, \exceptin{long}{..}.
+%   Groups get no environment; use \ifversion{long}{\input{..}}{}.
+%
+%   The commands take any content except verbatim: \onlyin{arxiv}{\cite{x}},
+%   \ifversion{conference}{\input{sections/short}}{\input{sections/long}}.
+%
+% REVIEW MODE [paperkit]
+%   \versionseparator      printed between the two branches of \ifversion
+%                          (default: thin space, grey bar, thin space; works
+%                          in text and math). Change it after loading, e.g.
+%                          \renewcommand{\versionseparator}{ / }
+%   vt@color@multi         colour of text shared by several versions
+%                          (default blue!60!black); change it with
+%                          \colorlet{vt@color@multi}{teal}, between
+%                          \makeatletter and \makeatother.
+%
+% RULES
+%   * Declare a version before using its name, even in the preamble.
+%   * \begin{<version>} and \end{<version>} must each be on a line of their
+%     own, and an environment cannot be nested inside itself.
+%   * Blocks are groups: a \newcommand or \setlength inside one is local to it.
+%   * A misspelled version name is an error; it never drops text silently.
+%     A misspelled selected version is reported at \begin{document}.
+%   * Review mode shows both branches of \ifversion in the document body,
+%     with \versionseparator between them. In the preamble it acts as the
+%     first declared version.
+%   * [paperkit] Declare a group after its members (members may be groups).
+%     A group cannot share a name with a version or `review'. In review
+%     mode, text of a group has the colour of text in several versions.
+%
+% =============================================================
+
+\NeedsTeXFormat{LaTeX2e}[2022/11/01]
+\ProvidesPackage{versiontoggle}[2026/10/26 Multiple paper versions from one source (paperkit)]
+
+\RequirePackage{etoolbox}
+\RequirePackage{comment}
+\RequirePackage{xcolor}
+
+% --- Options -------------------------------------------------
+\def\vt@optversion{}
+\def\vt@label{auto}
+\def\vt@optoverleaf{}% [paperkit]
+\DeclareKeys{
+  version.store = \vt@optversion,
+  overleaf.store = \vt@optoverleaf,% [paperkit]
+  label.store = \vt@label,
+  label.default:n = true,
+  nolabel.code = \def\vt@label{false},
+  nolabel.value_forbidden:n = true,
+}
+\ProcessKeyOptions
+\ifboolexpr{test {\ifdefstring{\vt@label}{auto}}
+         or test {\ifdefstring{\vt@label}{true}}
+         or test {\ifdefstring{\vt@label}{false}}}
+  {}
+  {\PackageError{versiontoggle}
+    {Invalid value `\vt@label' for option label}
+    {Use label=auto, label=true, or label=false.}%
+   \def\vt@label{auto}}
+
+% --- Selecting the version -----------------------------------
+% \vt@requested is the name asked for; \vt@current is the version whose
+% content is typeset (in review mode, the first declared version, used for
+% preamble \ifversion).
+% [paperkit] Overleaf compiles with job name `output'; \IfOverleafTF tests it.
+\newif\ifvt@overleaf
+\edef\vt@jobname{\jobname}
+\edef\vt@overleafjob{\detokenize{output}}
+\ifx\vt@jobname\vt@overleafjob \vt@overleaftrue \fi
+\newcommand{\IfOverleafTF}{%
+  \ifvt@overleaf\expandafter\@firstoftwo\else\expandafter\@secondoftwo\fi}
+\ifdefined\paperversion
+  \edef\vt@requested{\paperversion}
+\else
+  \let\vt@requested\vt@optversion
+  % [paperkit] overleaf=<name> wins over version= on Overleaf only
+  \ifvt@overleaf\ifdefempty{\vt@optoverleaf}{}{\let\vt@requested\vt@optoverleaf}\fi
+\fi
+\ifdefempty{\vt@requested}
+  {\PackageError{versiontoggle}
+    {No version selected}
+    {Use \string\usepackage[version=<name>]{versiontoggle}, or define
+     \string\paperversion\space before loading the package.}%
+   \def\vt@requested{review}}
+  {}
+\providecommand{\paperversion}{}
+\let\paperversion\vt@requested
+\let\thisversion\vt@requested% [paperkit]
+
+\newif\ifvt@review
+\newif\ifvt@indoc
+\ifdefstring{\vt@requested}{review}
+  {\vt@reviewtrue\def\vt@current{}}
+  {\let\vt@current\vt@requested}
+
+% --- Declaring versions --------------------------------------
+\newcommand*{\vt@versions}{}
+\newcommand*{\vt@versionnames}{}
+
+% Review-mode colours, used in order by \DeclareVersion without a colour
+% (gray once they run out)
+\newcommand*{\vt@palette}{}
+\listadd\vt@palette{orange!85!black}
+\listadd\vt@palette{magenta!80!black}
+\listadd\vt@palette{cyan!60!black}
+\listadd\vt@palette{green!50!black}
+\listadd\vt@palette{violet}
+\listadd\vt@palette{blue!70!black}
+\newcount\vt@colorindex
+\newcount\vt@tmpcount
+% \vt@popcolor: \vt@nextcolor := next unused palette colour
+\newcommand*{\vt@popcolor}{%
+  \def\vt@nextcolor{gray}%
+  \global\advance\vt@colorindex 1
+  \vt@tmpcount=0
+  \def\do##1{%
+    \advance\vt@tmpcount 1
+    \ifnum\vt@tmpcount=\vt@colorindex \def\vt@nextcolor{##1}\fi}%
+  \dolistloop{\vt@palette}}
+
+% Colour for text that belongs to several (but not all) versions [paperkit:
+% dark blue, unlike the first five palette colours; the sixth, blue!70!black, is close to it]
+\colorlet{vt@color@multi}{blue!60!black}
+
+% [paperkit] Printed between the two branches of \ifversion in review mode
+\newcommand{\versionseparator}{\,{\color{gray}\ensuremath{\vert}}\,}
+
+% \DeclareVersion[<review-mode colour>]{<name>}
+\newcommand{\DeclareVersion}[2][]{%
+  \ifstrequal{#2}{review}
+    {\PackageError{versiontoggle}
+      {`review' is reserved and cannot be declared as a version}{}}
+    {\ifinlist{#2}{\vt@versions}
+      {\PackageError{versiontoggle}{Version `#2' is declared twice}{}}
+      {\ifcsdef{vt@group@#2}% [paperkit]
+        {\PackageError{versiontoggle}
+          {`#2' is already a version group}{Pick another name.}}
+        {\vt@declare{#1}{#2}}}}}
+\@onlypreamble\DeclareVersion
+
+\newcommand{\vt@declare}[2]{%
+  \listadd{\vt@versions}{#2}%
+  \ifdefempty{\vt@versionnames}
+    {\def\vt@versionnames{#2}}
+    {\appto\vt@versionnames{, #2}}%
+  \ifstrempty{#1}
+    {\vt@popcolor\colorlet{vt@color@#2}{\vt@nextcolor}}
+    {\colorlet{vt@color@#2}{#1}}%
+  % In the preamble, review mode behaves as the first declared version
+  \ifvt@review\ifdefempty{\vt@current}{\def\vt@current{#2}}{}\fi
+  % Block environment for this version
+  \ifvt@review
+    \specialcomment{#2}{\begingroup\color{vt@color@#2}}{\endgroup}%
+  \else
+    \ifdefstring{\vt@current}{#2}{\includecomment{#2}}{\excludecomment{#2}}%
+  \fi}
+
+% --- Validation ----------------------------------------------
+\newcommand{\vt@check}[1]{%
+  \xifinlist{#1}{\vt@versions}{}
+    {\PackageError{versiontoggle}
+      {Unknown version `#1'}
+      {Declared versions: \vt@versionnames. Add new ones with
+       \string\DeclareVersion\space in the preamble.}}}
+
+\AtEndPreamble{%
+  \ifdefempty{\vt@versions}
+    {\PackageError{versiontoggle}
+      {No versions declared}
+      {Add \string\DeclareVersion{<name>} to the preamble.}}
+    {\ifvt@review\else\vt@check{\vt@current}\fi}}
+\AtBeginDocument{\vt@indoctrue}
+
+% \vt@forcsv{<handler>}{<csv list>}: like \forcsvlist, ignoring all spaces
+% [paperkit] group names are replaced by their members (duplicates dropped)
+\newcommand{\vt@forcsv}[2]{%
+  \vt@expandgroups{#2}%
+  \expandafter\vt@forcsv@\expandafter{\vt@explist}{#1}}
+\newcommand{\vt@forcsv@}[2]{\forcsvlist{#2}{#1}}
+
+% --- [paperkit] Version groups -------------------------------
+% \vt@expandgroups{<csv list>}: \vt@explist := the list without spaces,
+% each group replaced by its members, each name once. Unknown names are
+% kept, so the caller's \vt@check reports them.
+\newcommand{\vt@expandgroups}[1]{%
+  \def\vt@explist{}\def\vt@expseen{}%
+  \edef\vt@tmplist{\zap@space#1 \@empty}%
+  \expandafter\forcsvlist\expandafter\vt@exp@item\expandafter{\vt@tmplist}}
+\newcommand{\vt@exp@item}[1]{%
+  \ifcsdef{vt@group@#1}
+    {\letcs\vt@grp{vt@group@#1}%
+     \expandafter\forcsvlist\expandafter\vt@exp@add\expandafter{\vt@grp}}
+    {\vt@exp@add{#1}}}
+\newcommand{\vt@exp@add}[1]{%
+  \ifinlist{#1}{\vt@expseen}{}
+    {\listadd\vt@expseen{#1}%
+     \ifdefempty{\vt@explist}{\def\vt@explist{#1}}{\appto\vt@explist{,#1}}}}
+
+% \DeclareVersionGroup{<group>}{<versions or groups>}; stores the members
+% (groups already expanded) in \vt@group@<group>
+\newcommand{\DeclareVersionGroup}[2]{%
+  \ifboolexpr{test {\ifstrequal{#1}{review}} or test {\ifinlist{#1}{\vt@versions}}}
+    {\PackageError{versiontoggle}
+      {Group name `#1' is already a version (or `review')}{Pick another name.}}
+    {\ifcsdef{vt@group@#1}
+      {\PackageError{versiontoggle}{Version group `#1' is declared twice}{}}
+      {\vt@expandgroups{#2}%
+       \ifdefempty{\vt@explist}
+         {\PackageError{versiontoggle}{Version group `#1' is empty}{}}
+         {\forlistloop{\vt@check}{\vt@expseen}%
+          \csedef{vt@group@#1}{\vt@explist}}}}}
+\@onlypreamble\DeclareVersionGroup
+
+% \vt@inlist{<name>}{<csv list>}{<true>}{<false>}; validates every list item
+\newcommand{\vt@inlist}[4]{%
+  \edef\vt@needle{#1}%
+  \let\vt@hit\@secondoftwo
+  \vt@forcsv{\vt@inlist@item}{#2}%
+  \vt@hit{#3}{#4}}
+\newcommand{\vt@inlist@item}[1]{%
+  \vt@check{#1}%
+  \ifdefstring{\vt@needle}{#1}{\let\vt@hit\@firstoftwo}{}}
+
+% --- Version label on every page ------------------------------
+\newif\ifvt@showlabel
+\ifdefstring{\vt@label}{true}{\vt@showlabeltrue}{}
+\ifdefstring{\vt@label}{auto}{\ifvt@review\vt@showlabeltrue\fi}{}
+\ifvt@showlabel
+  \AddToHook{shipout/foreground}{%
+    \put(\dimexpr\paperwidth-0.4in\relax,-0.3in){%
+      \makebox(0,0)[rt]{\normalfont\footnotesize\color{red}(\vt@requested)}}}
+\fi
+
+% --- Review-mode colouring -----------------------------------
+% \vt@mark{<csv list>}{<text>}: text in the colour of the list's version
+% (vt@color@multi if the list names several versions)
+\newcommand{\vt@mark}[2]{%
+  \def\vt@count{0}%
+  \vt@forcsv{\vt@mark@item}{#1}%
+  \ifnum\vt@count=1
+    \edef\vt@col{vt@color@\vt@last}%
+  \else
+    \def\vt@col{vt@color@multi}%
+  \fi
+  {\color{\vt@col}\relax#2}}
+\newcommand{\vt@mark@item}[1]{%
+  \vt@check{#1}%
+  \edef\vt@count{\the\numexpr\vt@count+1}%
+  \def\vt@last{#1}}
+
+% \vt@complement{<csv list>}: \vt@comp := declared versions not in the list
+\newcommand{\vt@complement}[1]{%
+  \def\vt@comp{}%
+  \def\do##1{%
+    \vt@inlist{##1}{#1}{}
+      {\ifdefempty{\vt@comp}{\def\vt@comp{##1}}{\appto\vt@comp{,##1}}}}%
+  \dolistloop{\vt@versions}}
+
+% --- User commands -------------------------------------------
+
+% \onlyin{<versions>}{<text>}
+\newrobustcmd{\onlyin}[2]{%
+  \let\vt@branch\@secondoftwo
+  \ifvt@review\let\vt@branch\@firstoftwo\fi
+  \vt@branch
+    {\vt@mark{#1}{#2}}
+    {\vt@inlist{\vt@current}{#1}{#2}{}}}
+
+% \ifversion{<versions>}{<if one of them>}{<otherwise>}
+\newrobustcmd{\ifversion}[3]{%
+  \let\vt@branch\@secondoftwo
+  \ifvt@review\ifvt@indoc\let\vt@branch\@firstoftwo\fi\fi
+  \vt@branch
+    {\vt@mark{#1}{#2}%
+     \vt@complement{#1}%
+     \ifdefempty{\vt@comp}{}
+       {\ifboolexpr{test {\ifblank{#2}} or test {\ifblank{#3}}}{}{\versionseparator}%
+        \expandafter\vt@mark\expandafter{\vt@comp}{#3}}}
+    {\vt@inlist{\vt@current}{#1}{#2}{#3}}}
+
+% [paperkit] \exceptin{<versions>}{<text>}: text in every other version
+% (review mode, document body: coloured like the else-branch of \ifversion)
+\newrobustcmd{\exceptin}[2]{%
+  \let\vt@branch\@secondoftwo
+  \ifvt@review\ifvt@indoc\let\vt@branch\@firstoftwo\fi\fi
+  \vt@branch
+    {\vt@complement{#1}%
+     \ifdefempty{\vt@comp}{}{\expandafter\vt@mark\expandafter{\vt@comp}{#2}}}
+    {\vt@inlist{\vt@current}{#1}{}{#2}}}

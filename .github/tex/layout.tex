@@ -1,0 +1,69 @@
+% .github/tex/layout.tex - packages, title block and bibliography style for each document class.
+% Classes: IEEEtran (conference and journal), ieeeconf (CDC/ACC), elsarticle, llncs, acmart and article.
+% Of the files in .github/, only this one is meant to be edited for a paper. For another class, add a branch below
+% that sets \title, \author, \paperfront and \paperbibstyle as that class requires.
+\makeatletter
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\@ifclassloaded{acmart}{}{\usepackage{amssymb}}      % acmart's fonts already define these symbols; amssymb would clash
+\@ifclassloaded{ieeeconf}{\let\proof\relax\let\endproof\relax}{}   % remove ieeeconf's proof so that amsthm defines it
+\@ifclassloaded{llncs}{}{\usepackage{amsthm}}         % llncs defines its own proof environment
+\usepackage{graphicx,wrapfig,needspace,booktabs,array}
+\@ifpackageloaded{natbib}{}{\usepackage{cite}}        % elsarticle loads natbib
+\@ifpackageloaded{hyperref}{\hypersetup{hidelinks}}{\usepackage[hidelinks]{hyperref}}   % acmart loads it
+\usepackage[capitalize,noabbrev]{cleveref}
+
+\@ifundefined{proposition}{\newtheorem{proposition}{Proposition}}{}
+\crefname{proposition}{Proposition}{Propositions}
+
+% \arxivref{label} prints "Appendix A" in the arXiv version and "Appendix A of [5]" in the others, where
+% [5] is \cite{arxiv}. The others read the labels from refs/extended_labels.tex, which the build copies
+% from the .aux file of the arXiv version, and store each one as ext-<label>. The file is .tex, not .aux,
+% because Overleaf drops *.aux files.
+\ifversion{arxiv}
+  {\newcommand{\arxivref}[1]{Appendix~\ref{#1}}}
+  {\newcommand{\arxivref}[1]{Appendix~\ref*{ext-#1} of~\cite{arxiv}}%
+   {\def\newlabel#1#2{\expandafter\gdef\csname r@ext-#1\endcsname{#2}}%
+    \InputIfFileExists{refs/extended_labels}{}{\InputIfFileExists{../refs/extended_labels}{}{}}}}
+
+% Title block and bibliography style of each class.
+\newcommand{\paperabstract}{\begin{abstract}\input{sections/abstract}\end{abstract}}
+\@ifclassloaded{IEEEtran}{%                         % IEEE conference and IEEE Transactions
+  \title{\papertitle}
+  \ifCLASSOPTIONconference \author{\IEEEauthorblockN{\paperauthors}\IEEEauthorblockA{\paperaffiliation}}
+  \else \author{\paperauthors\thanks{The authors are with \paperaffiliation.}}\fi
+  \newcommand{\paperfront}{\maketitle\paperabstract}
+  \newcommand{\paperbibstyle}{IEEEtran}
+}{\@ifclassloaded{ieeeconf}{%                        % IEEE CDC / ACC: letter paper, 10 pt
+  \IEEEoverridecommandlockouts\overrideIEEEmargins   % \thanks allowed; margins of the CDC/ACC call
+  \title{\LARGE\bf \papertitle}
+  \author{\paperauthors\thanks{The authors are with \paperaffiliation.}}
+  \newcommand{\paperfront}{\maketitle\thispagestyle{empty}\pagestyle{empty}\paperabstract}
+  \newcommand{\paperbibstyle}{IEEEtran}
+}{\@ifclassloaded{elsarticle}{%
+  \newcommand{\paperfront}{\begin{frontmatter}\title{\papertitle}\author{\paperauthors}
+    \address{\paperaffiliation}\paperabstract\end{frontmatter}}   % \address, because \affiliation{organization=...} prints a trailing comma
+  \newcommand{\paperbibstyle}{elsarticle-num}
+}{\@ifclassloaded{llncs}{%
+  \title{\papertitle}\author{\paperauthors}\institute{\paperaffiliation}
+  \newcommand{\paperfront}{\maketitle\paperabstract}
+  \newcommand{\paperbibstyle}{splncs04}
+}{\@ifclassloaded{acmart}{%                          % the abstract comes before \maketitle
+  \title{\papertitle}\author{\paperauthors}\affiliation{\institution{\paperaffiliation}\city{}\country{}}
+  \@ifundefined{paperkeywords}{}{\keywords{\paperkeywords}}
+  \@ifundefined{paperccs}{\ccsdesc[500]{Computer systems organization~Embedded and cyber-physical systems}}{\paperccs}   % CCS concept: set \paperccs to change it
+  \newcommand{\paperfront}{\paperabstract\maketitle}
+  \newcommand{\paperbibstyle}{ACM-Reference-Format}
+}{%
+  \title{\papertitle}\author{\paperauthors\\[2pt]\normalsize\paperaffiliation}\date{}
+  \newcommand{\paperfront}{\maketitle\paperabstract}
+  \newcommand{\paperbibstyle}{unsrt}
+}}}}}
+
+% Figure shapes (height/width) for two-column and one-column layouts: \autofig[aspect=\figaspect]{name}.
+\newif\iftwocolumn \if@twocolumn \twocolumntrue \fi
+\@ifclassloaded{acmart}{% acmart sets two columns only at \maketitle; two-column formats: acmtog, sigconf, siggraph, sigplan, sigchi, acmengage
+  \ifcase\ACM@format@nr\or\or\or\twocolumntrue\or\twocolumntrue\or\twocolumntrue\or\twocolumntrue\or\twocolumntrue\or\or\twocolumntrue\fi}{}
+\iftwocolumn \newcommand{\figaspect}{0.62}\newcommand{\wideaspect}{0.38}   % \figaspect: one column wide; \wideaspect: full text width
+\else        \newcommand{\figaspect}{0.45}\newcommand{\wideaspect}{0.5}\fi
+\makeatother

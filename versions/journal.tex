@@ -1,0 +1,9 @@
+% versions/journal.tex - the journal version, Elsevier template (elsarticle).
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line, \paperversion and the page limit.
+% page limit: none   % or a number of pages, references included; make -f .github/Makefile prints OVER when the PDF is longer
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass{elsarticle}
+\def\paperentryclassloaded{1}
+\def\paperversion{journal}
+\PassOptionsToPackage{final}{editmarks}   % accept every edit; this PDF is the one you submit
+\input{main}

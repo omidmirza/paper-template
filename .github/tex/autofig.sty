@@ -1,0 +1,203 @@
+% =============================================================
+% autofig.sty - figures drawn at the exact size they take in the text (paperkit)
+% =============================================================
+% Each \autofig writes its slot (width, height, body font size, font
+% family) to \jobname.afg. `python -m autofig make` draws the figure at
+% that size, and the next LaTeX run includes it without scaling.
+%
+% SETUP (preamble)
+%   \usepackage[draft]{autofig}     % draft (default): stale or wrong-size figures
+%                                   % get a red frame; final: no frame, a log line only.
+%                                   % A missing figure is a red box in both modes.
+%   \autofigsetup{dir=figures/auto, rawdir=figures/raw}   % defaults
+%
+% USE (in the document; the slot width is \linewidth where you call it)
+%   \autofig{step}                        height from the figure's ASPECT
+%   \autofig[aspect=0.5]{step}            height = 0.5 x width
+%   \autofig[height=4cm]{response}        fixed height
+%   \autofig[font=11pt, compact]{bars}    all figure text at 11 pt
+%   \rawfig{step}                         figures/raw/<name>.pdf, drawn with
+%                                         matplotlib defaults and scaled to
+%                                         \linewidth (for comparisons)
+%
+% FILES
+%   request  <outdir>/\jobname.afg, one line per slot:
+%            name=.. w=..pt h=.. f=.. family=serif|sans compact=0|1 base=.. job=..
+%   figure   <dir>/<name>_w<10W>[_h<10H>]_f<10F>[_sans].pdf   (tenths of pt)
+%   fallback <dir>/<name>.pdf  (used scaled, and marked, until the figure is drawn)
+%
+% RULES
+%   * Slot width = \linewidth: correct in figure, figure*, wrapfigure (give a
+%     width), minipage, p{} table columns, beamer columns. Not in c/l/r
+%     table columns (they have no width: use p{}).
+%   * Body size F = \normalsize at \begin{document} (beamer: the `normal
+%     text' font). Family is sans when \familydefault is \sfdefault.
+%   * Do not scale an \autofig figure; change the slot and run make again.
+%   * The class options draft and final do not apply to this package.
+%   * Figure names and folder names must not contain spaces.
+% =============================================================
+
+\NeedsTeXFormat{LaTeX2e}[2022/11/01]
+\ProvidesPackage{autofig}[2026/10/26 Figure slots measured by LaTeX (paperkit)]
+
+\RequirePackage{graphicx}
+\RequirePackage{xcolor}
+
+% --- Options and setup ---------------------------------------
+\newif\ifaf@final
+\def\af@dir{figures/auto}
+\def\af@rawdir{figures/raw}
+\DeclareKeys{
+  draft.code = \af@finalfalse,
+  draft.value_forbidden:n = true,
+  final.code = \af@finaltrue,
+  final.value_forbidden:n = true,
+  dir.store = \af@dir,
+  rawdir.store = \af@rawdir,
+}
+\let\af@classopts\@raw@classoptionslist % (\relax = no class options)
+\let\@raw@classoptionslist\relax
+\ProcessKeyOptions
+\let\@raw@classoptionslist\af@classopts
+
+\DeclareKeys[autofig/setup]{
+  dir.store = \af@dir,
+  rawdir.store = \af@rawdir,
+}
+\NewDocumentCommand{\autofigsetup}{m}{\SetKeys[autofig/setup]{#1}}
+
+% Keys of one slot (reset at every \autofig)
+\newif\ifaf@compact
+\DeclareKeys[autofig/slot]{
+  height.store = \af@k@height,
+  aspect.store = \af@k@aspect,
+  font.store   = \af@k@font,
+  compact.if   = af@compact,
+  compact.default:n = true,
+}
+
+% --- Body size, family, request file -------------------------
+\newdimen\af@body
+\def\af@family{serif}
+\def\af@sfx{}% file-name suffix: _sans for sans slots
+\newwrite\af@out
+\newif\ifaf@open
+\AddToHook{begindocument/end}{%
+  \begingroup
+    \normalsize
+    \ifdefined\usebeamerfont \usebeamerfont{normal text}\fi
+    \global\af@body=\f@size pt\relax
+  \endgroup
+  \edef\af@tmpa{\familydefault}\edef\af@tmpb{\sfdefault}%
+  \ifx\af@tmpa\af@tmpb \def\af@family{sans}\def\af@sfx{_sans}\fi
+  \immediate\openout\af@out=\jobname.afg\relax
+  \af@opentrue}
+
+% --- Number formatting (expandable) --------------------------
+% \af@tenths{<dim>} -> round(10 x dim/pt), e.g. 252.94pt -> 2529
+\def\af@tenths#1{\the\numexpr\dimexpr#1\relax*10/65536\relax}
+% \af@pt{<dim>} -> dim in pt with 2 decimals, e.g. 252.94
+\def\af@pt#1{\expandafter\af@pt@\the\numexpr\dimexpr#1\relax*100/65536\relax;}
+\def\af@pt@#1;{%
+  \ifnum#1<50 0.\af@two#1;%
+  \else\the\numexpr(#1-50)/100\relax.%
+    \expandafter\af@two\the\numexpr#1-((#1-50)/100)*100\relax;\fi}
+\def\af@two#1;{\ifnum#1<10 0\fi#1}
+
+% --- Counters for the end-of-document summary ----------------
+\newcount\af@nslots
+\newcount\af@nok
+\newcount\af@nmissing
+\AddToHook{enddocument/afterlastpage}{%
+  \typeout{autofig: \the\af@nslots\space slots, \the\af@nok\space up to date,
+    \the\numexpr\af@nslots-\af@nok\relax\space stale}%
+  \ifnum\af@nmissing>0
+    \typeout{autofig: \the\af@nmissing\space missing (run make -f .github/Makefile)}\fi
+  \ifaf@open\immediate\closeout\af@out\fi}
+
+% --- The slot command ----------------------------------------
+\newdimen\af@W \newdimen\af@H \newdimen\af@F
+\newsavebox\af@box
+\NewDocumentCommand{\autofig}{O{}m}{%
+  \begingroup
+  \def\af@k@height{}\def\af@k@aspect{}\def\af@k@font{}\af@compactfalse
+  \SetKeys[autofig/slot]{#1}%
+  \af@W=\linewidth
+  \ifx\af@k@font\@empty \af@F=\af@body \else \af@F=\dimexpr\af@k@font\relax \fi
+  \af@H=\z@
+  \ifx\af@k@aspect\@empty\else \af@H=\af@k@aspect\af@W \fi
+  \ifx\af@k@height\@empty\else \af@H=\dimexpr\af@k@height\relax \fi
+  \edef\af@name{\detokenize{#2}}%
+  % (no spaces: a line end after a control word adds none)
+  \edef\af@base{\af@dir/\af@name _w\af@tenths\af@W
+    \ifdim\af@H>\z@ _h\af@tenths\af@H\fi _f\af@tenths\af@F\af@sfx}%
+  \edef\af@base{\detokenize\expandafter{\af@base}}%
+  \global\advance\af@nslots 1
+  \ifaf@open
+    \immediate\write\af@out{name=\af@name\space w=\af@pt\af@W\space
+      h=\af@pt\af@H\space f=\strip@pt\af@F\space family=\af@family\space
+      compact=\ifaf@compact 1\else 0\fi\space base=\af@base\space job=\jobname}%
+  \fi
+  \IfFileExists{\af@base.pdf}
+    {\sbox\af@box{\includegraphics{\af@base.pdf}}%
+     \@tempdima=\dimexpr\wd\af@box-\af@W\relax
+     \ifdim\@tempdima<\z@ \@tempdima=-\@tempdima \fi
+     \ifdim\@tempdima>1pt \expandafter\@firstoftwo\else\expandafter\@secondoftwo\fi
+       {\af@status{size mismatch}%
+        \PackageWarning{autofig}{`\af@name': \af@base.pdf is
+          \af@pt{\wd\af@box} pt wide, the slot is \af@pt\af@W\space pt}%
+        \af@flag{autofig: size mismatch (\af@pt{\wd\af@box} pt in a
+          \af@pt\af@W\space pt slot), run make -f .github/Makefile}}
+       {\global\advance\af@nok 1 \af@status{up to date}\usebox\af@box}}
+    {\IfFileExists{\af@dir/\af@name.pdf}
+      {\af@status{stale}%
+       \PackageWarning{autofig}{`\af@name': no figure for this slot
+         (\af@base.pdf); using \af@dir/\af@name.pdf scaled. Run make -f .github/Makefile}%
+       \sbox\af@box{\includegraphics[width=\af@W]{\af@dir/\af@name.pdf}}%
+       \af@flag{autofig: stale, run make -f .github/Makefile (\af@pt\af@W\space pt)}}
+      {\af@status{missing}\global\advance\af@nmissing 1
+       \PackageWarning{autofig}{`\af@name' missing (\af@base.pdf).
+         Run make -f .github/Makefile}%
+       \af@placeholder{autofig: \af@name\ missing, run make -f .github/Makefile
+         (\af@pt\af@W\space pt)}}}%
+  \endgroup}
+
+\newcommand{\af@status}[1]{%
+  \typeout{autofig: slot \af@name\space w=\af@pt\af@W\space h=\af@pt\af@H\space
+    f=\strip@pt\af@F\space family=\af@family\space -> \af@base\space (#1)}}
+
+% \af@flag{<label>}: \af@box, in draft mode with a red dashed frame + label
+\newcommand{\af@flag}[1]{%
+  \leavevmode
+  \ifaf@final \usebox\af@box \else
+    \begingroup
+    \setlength\unitlength{1pt}%
+    \edef\af@ow{\strip@pt\wd\af@box}\edef\af@oh{\strip@pt\ht\af@box}%
+    \edef\af@ly{\strip@pt\dimexpr\ht\af@box-1.5pt\relax}%
+    \begin{picture}(\af@ow,\af@oh)
+      \put(0,0){\usebox\af@box}%
+      \put(0,0){\color{red}\thinlines\dashbox{3}(\af@ow,\af@oh){}}%
+      \put(1.5,\af@ly){\makebox(0,0)[lt]{\af@label{#1}}}%
+    \end{picture}%
+    \endgroup
+  \fi}
+\newcommand{\af@label}[1]{%
+  \colorbox{white}{\parbox[t]{\dimexpr\wd\af@box-3pt-2\fboxsep\relax}{%
+    \raggedright\fontsize{7}{8}\selectfont\sffamily\color{red}#1}}}
+
+% \af@placeholder{<text>}: framed W x (H or 0.62 W) box
+\newcommand{\af@placeholder}[1]{%
+  \ifdim\af@H>\z@\else \af@H=0.62\af@W \fi
+  \leavevmode
+  \fcolorbox{red}{white}{\parbox[c][\dimexpr\af@H-2\fboxsep-2\fboxrule\relax][c]%
+    {\dimexpr\af@W-2\fboxsep-2\fboxrule\relax}%
+    {\centering\fontsize{7}{8}\selectfont\sffamily\color{red}#1\par}}}
+
+% --- \rawfig: the figure with matplotlib defaults, scaled to the line (for comparison)
+\NewDocumentCommand{\rawfig}{m}{%
+  \IfFileExists{\af@rawdir/#1.pdf}
+    {\includegraphics[width=\linewidth]{\af@rawdir/#1.pdf}}
+    {\begingroup\af@W=\linewidth \af@H=\z@
+     \PackageWarning{autofig}{Raw figure `#1' missing
+       (\af@rawdir/#1.pdf). Run python -m autofig raw}%
+     \af@placeholder{rawfig: #1 missing, run python -m autofig raw}\endgroup}}

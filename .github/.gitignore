@@ -1,0 +1,19 @@
+# Build output, releases and Python environments inside .github/.
+build/
+pdf/
+releases/
+.venv/
+.venv*/
+__pycache__/
+# Files that LaTeX leaves when a file inside .github/ is compiled.
+*.aux
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.vrb
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+.DS_Store

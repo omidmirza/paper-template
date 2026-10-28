@@ -1,0 +1,4 @@
+# Git tracks only the .tex files here and ignores the files pdflatex writes when it compiles in this folder.
+*
+!*.tex
+!.gitignore

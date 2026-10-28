@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# pre-commit - stop commits that would break the paper for co-authors or on Overleaf.
+# .github/tools/setup_git.sh installs it. It refuses build output (.github/build/, .github/pdf/, *.aux,
+# *.log, ...), conflict markers in .tex, .bib, .sty or .cls files, files over 50 MB, and figures in
+# figures/auto/ that fail `python -m autofig check` (that check is skipped, with a warning, when Python
+# or matplotlib is missing). To skip all checks once: git commit --no-verify
+
+set -euo pipefail
+PK_NAME=pre-commit
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/_common.sh"
+
+TOP="$(git rev-parse --show-toplevel)"
+cd "$TOP"
+BAD=0
+FIGS=()
+while IFS= read -r -d '' f; do
+  case "$f" in
+    build/*|*/build/*|pdf/*|*/pdf/*|releases/*|*/releases/*|\
+    *.aux|*.log|*.fls|*.fdb_latexmk|*.synctex.gz|*.afg|*.blg|*.out|*/__pycache__/*|*/.venv/*|*.DS_Store)
+      warn "build output staged: $f"; BAD=1 ;;
+  esac
+  case "$f" in
+    *.tex|*.bib|*.sty|*.cls)
+      if git show ":$f" | grep -nE '^(<<<<<<<|>>>>>>>)( |$)' >/dev/null; then
+        warn "conflict markers in $f (finish the merge first)"; BAD=1; fi ;;
+  esac
+  size="$(git cat-file -s ":$f" 2>/dev/null || echo 0)"
+  if [ "$size" -gt 52428800 ]; then warn "$f is larger than 50 MB (Overleaf refuses it)"; BAD=1; fi
+  case "$f" in figures/auto/*.pdf|*/figures/auto/*.pdf) FIGS+=("$f") ;; esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+# Figure rules on staged figures: one `autofig check` per paper root (the folder above figures/).
+if [ ${#FIGS[@]} -gt 0 ]; then
+  pk_find_python "$TOP"
+  if pk_autofig_ok; then
+    while IFS= read -r root; do
+      list=()
+      for f in "${FIGS[@]}"; do r="${f%figures/auto/*}"; [ "${r:-./}" = "$root" ] && list+=("${f#"$r"}"); done
+      pk_find_python "$TOP/$root"
+      if ! out="$(cd "$TOP/$root" && pk_autofig check "${list[@]}" 2>&1)"; then
+        printf '%s\n' "$out" >&2; warn "figure(s) in ${root} break the figure rules (python -m autofig check)"; BAD=1
+      fi
+    done < <(for f in "${FIGS[@]}"; do r="${f%figures/auto/*}"; echo "${r:-./}"; done | sort -u)
+  else
+    warn "figure check skipped for ${#FIGS[@]} figure(s)"
+  fi
+fi
+
+if [ "$BAD" = 1 ]; then
+  printf '[pre-commit] commit refused. Unstage with: git restore --staged <file>   (bypass: git commit --no-verify)\n' >&2
+  exit 1
+fi
+exit 0

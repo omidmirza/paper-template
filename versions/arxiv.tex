@@ -1,0 +1,10 @@
+% versions/arxiv.tex - the arXiv version, one column (article), with the proofs.
+% On Overleaf, open this file and press Recompile. EDIT HERE: the class line, \paperversion and the page limit.
+% page limit: none   % or a number of pages, references included; make -f .github/Makefile prints OVER when the PDF is longer
+\makeatletter\IfFileExists{setup.tex}{}{\def\input@path{{../}{../.github/tex/}}}\makeatother   % when compiled from inside versions/, look for files in the top folder and in .github/tex/
+\documentclass[11pt]{article}
+\def\paperentryclassloaded{1}
+\def\paperversion{arxiv}
+\usepackage[a4paper,margin=1in]{geometry}
+\PassOptionsToPackage{final}{editmarks}   % accept every edit; this PDF is the one you submit
+\input{main}

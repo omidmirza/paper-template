@@ -1,0 +1,22 @@
+{
+ "name": "example",
+ "spec": "figures/src/example.py",
+ "spec_hash": "e39df873f89c70da",
+ "style_version": "v8-paperkit-1",
+ "request": {
+  "w": 245.72,
+  "h": 152.34,
+  "f": 10.0,
+  "family": "serif",
+  "compact": false
+ },
+ "size_pt": [
+  245.71,
+  152.34
+ ],
+ "min_text_pt": 11.0,
+ "warnings": [],
+ "jobs": [
+  "cdc"
+ ]
+}
